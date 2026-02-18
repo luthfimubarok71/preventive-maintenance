@@ -1,0 +1,73 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use App\Models\InspeksiFmeaDetail;
+use App\Models\InspeksiKondisiUmum;
+use App\Models\PmSchedule;
+use App\Models\Approval;
+
+class InspeksiHeader extends Model
+{
+    protected $table = 'inspeksi_headers';
+
+    protected $fillable = [
+        'segment_inspeksi',
+        'jalur_fo',
+        'nama_pelaksana',
+        'driver',
+        'cara_patroli',
+        'cara_patroli_lainnya',
+        'tanggal_inspeksi',
+        'priority',
+        'schedule_pm',
+        'prepared_by',
+        'approved_by',
+        'prepared_signature',
+        'approved_signature',
+        'schedule_id',
+        'status_workflow'
+    ];
+
+    protected $casts = [
+        'tanggal_inspeksi' => 'date',
+    ];
+
+    public function fmeaDetails(): HasMany
+    {
+        return $this->hasMany(InspeksiFmeaDetail::class, 'inspeksi_id');
+    }
+
+    public function kondisiUmum(): HasOne
+    {
+        return $this->hasOne(InspeksiKondisiUmum::class, 'inspeksi_id');
+    }
+
+    public function pmSchedule(): BelongsTo
+    {
+        return $this->belongsTo(PmSchedule::class, 'schedule_id');
+    }
+
+   public function approvals(): MorphMany
+{
+    return $this->morphMany(Approval::class, 'approvable');
+}
+
+       
+    public function getRiskSummaryAttribute()
+    {
+        $maxRpn = $this->fmeaDetails()->max('rpn');
+        if ($maxRpn >= 100) {
+            return ['priority' => 'KRITIS', 'recommendation' => 'Perlu perbaikan segera'];
+        } elseif ($maxRpn >= 50) {
+            return ['priority' => 'SEDANG', 'recommendation' => 'Pantau kondisi'];
+        } else {
+            return ['priority' => 'RENDAH', 'recommendation' => 'Jadwalkan inspeksi rutin'];
+        }
+    }
+}
