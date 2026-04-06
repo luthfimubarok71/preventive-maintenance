@@ -10,52 +10,115 @@ use Illuminate\Support\Facades\Auth;
 
 class InspeksiController extends Controller
 {
-    public function store(Request $request)
-    {
-        // Check if there's an approved schedule for today and segment
-        $approvedSchedule = PmSchedule::where('segment_inspeksi', $request->segment_inspeksi)
-            ->where('status', 'approved')
-            ->where('planned_date', today())
-            ->first();
+    /**
+     * Store new inspection - enforces schedule requirement and sets workflow status
+     */
+public function store(Request $request)
+{
+    $request->validate([
+        'segment_inspeksi' => 'required|string|max:150',
+        'tanggal_inspeksi' => 'required|date',
+        'schedule_id' => 'required|exists:pm_schedules,id'
+    ]);
 
-        if (!$approvedSchedule) {
-            return back()->with('error', 'Tidak ada jadwal PM yang disetujui untuk segment ini hari ini.');
+    $schedule = PmSchedule::findOrFail($request->schedule_id);
+
+    $status = $request->action === 'submit_ro'
+        ? 'pending_ro'
+        : 'draft';
+
+    DB::transaction(function () use ($request, $schedule, $status) {
+
+        $inspeksi = InspeksiHeader::create([
+            'segment_inspeksi' => $request->segment_inspeksi,
+            'jalur_fo' => $request->jalur_fo,
+            'nama_pelaksana' => $request->nama_pelaksana,
+            'driver' => $request->driver,
+            'cara_patroli' => $request->cara_patroli,
+            'cara_patroli_lainnya' => $request->cara_patroli_lainnya,
+            'tanggal_inspeksi' => $request->tanggal_inspeksi,
+            'prepared_by' => Auth::id(),
+            'approved_by' => $request->approved_by,
+            'prepared_signature' => $request->prepared_canvas,
+            'approved_signature' => $request->approved_canvas,
+            'schedule_id' => $schedule->id,
+            'status_workflow' => $status
+        ]);
+
+        $objects = [
+            'kabel_putus',
+            'kabel_expose',
+            'penyangga',
+            'tiang',
+            'clamp',
+            'lingkungan',
+            'vegetasi',
+            'marker_post',
+            'hand_hole',
+            'aksesoris_ku',
+            'jc_odp'
+        ];
+
+        foreach ($objects as $obj) {
+
+            if ($request->has($obj)) {
+
+                $data = $request->$obj;
+
+                if (!is_array($data)) {
+                    $data = ['status' => $data];
+                }
+
+                $inspeksi->details()->create([
+                    'objek' => $obj,
+                    'status' => json_encode($data),
+                    'catatan' => $request->kondisi[$obj]['catatan'] ?? null
+                ]);
+            }
         }
 
-        DB::transaction(function () use ($request, $approvedSchedule) {
-            // Create inspection header linked to approved schedule
-            $inspeksi = InspeksiHeader::create([
-                'segment_inspeksi' => $request->segment_inspeksi,
-                'jalur_fo' => $request->jalur_fo,
-                'nama_pelaksana' => $request->nama_pelaksana,
-                'driver' => $request->driver,
-                'cara_patroli' => $request->cara_patroli,
-                'cara_patroli_lainnya' => $request->cara_patroli_lainnya,
-                'tanggal_inspeksi' => $request->tanggal_inspeksi,
-                'priority' => $request->priority,
-                'schedule_pm' => $request->schedule_pm,
-                'prepared_by' => $request->prepared_by,
-                'approved_by' => $request->approved_by,
-                'prepared_signature' => $request->prepared_signature,
-                'approved_signature' => $request->approved_signature,
-                'schedule_id' => $approvedSchedule->id,
-                'status_workflow' => 'draft', // Start as draft, will go through approval
-            ]);
+        if ($request->has('kondisi_umum')) {
+            $inspeksi->kondisiUmum()->create($request->kondisi_umum);
+        }
 
-            // Save kondisi umum if provided
-            if ($request->has('kondisi_umum')) {
-                $inspeksi->kondisiUmum()->create($request->kondisi_umum);
+        if ($request->has('fmea_details')) {
+            foreach ($request->fmea_details as $detail) {
+                $inspeksi->fmeaDetails()->create($detail);
             }
+        }
 
-            // Save FMEA details if provided
-            if ($request->has('fmea_details')) {
-                foreach ($request->fmea_details as $detail) {
-                    $inspeksi->fmeaDetails()->create($detail);
-                }
-            }
-        });
+    });
 
-        return back()->with('success', 'Data inspeksi berhasil disimpan dan menunggu approval.');
+    return redirect('/tasks')->with(
+        'success',
+        'Laporan berhasil disimpan'
+    );
+
+
+
+}
+
+    /**
+     * Submit inspection for RO approval (draft → pending_ro)
+     */
+    public function submitForApproval($id)
+    {
+        $inspeksi = InspeksiHeader::findOrFail($id);
+        
+        // Validate current status
+        if ($inspeksi->status_workflow !== 'draft') {
+            return back()->with('error', 'Inspeksi tidak dapat dikirim untuk approval dalam status saat ini.');
+        }
+
+        // Check if has schedule
+        if (!$inspeksi->schedule_id) {
+            return back()->with('error', 'Inspeksi harus terhubung dengan jadwal PM yang disetujui.');
+        }
+
+        // Update status to pending_ro
+        $inspeksi->update(['status_workflow' => 'pending_ro']);
+
+        return back()->with('success', 'Inspeksi berhasil dikirim untuk approval.');
     }
 
     public function riskSummary()
@@ -79,4 +142,106 @@ class InspeksiController extends Controller
 
         return view('admin.risk-summary', compact('segments'));
     }
+
+    /**
+     * Display inspection reports created by the logged-in technician
+     */
+    public function myReports()
+    {
+        // Get only reports created by the logged-in technician
+        $reports = InspeksiHeader::where('prepared_by', Auth::id())
+            ->with(['pmSchedule', 'approvals'])
+            ->orderBy('tanggal_inspeksi', 'desc')
+            ->get();
+
+        return view('inspeksi.my-reports', compact('reports'));
+    }
+
+  public function approveByRo(Request $request,$id)
+{
+    $report = InspeksiHeader::findOrFail($id);
+
+    $report->update([
+        'approved_signature' => $request->signature_ro,
+         // simpan user yang approve
+        'status_workflow' => 'pending_pusat'
+    ]);
+
+    return back()->with('success','Report disetujui oleh Kepala RO.');
+}
+
+public function rejectByRo(Request $request,$id)
+{
+
+$report = InspeksiHeader::findOrFail($id);
+
+$report->update([
+
+'status_workflow'=>'rejected'
+
+]);
+
+return back()->with('success','Report ditolak oleh Kepala RO.');
+
+}
+
+public function approveByPusat($id)
+{
+    $report = InspeksiHeader::findOrFail($id);
+
+    if ($report->status_workflow !== 'pending_pusat') {
+        return back()->with('error','Report tidak dalam status pending pusat.');
+    }
+
+    $report->update([
+        'status_workflow' => 'approved'
+    ]);
+
+    return back()->with('success','Report disetujui oleh pusat.');
+}
+
+
+public function rejectByPusat($id)
+{
+    $report = InspeksiHeader::findOrFail($id);
+
+    $report->update([
+        'status_workflow' => 'rejected'
+    ]);
+
+    return back()->with('success','Report ditolak oleh pusat.');
+}
+
+public function pendingRO()
+{
+    $reports = InspeksiHeader::where('status_workflow','pending_ro')
+        ->with(['pmSchedule.segment'])
+        ->latest()
+        ->get();
+
+    return view('approval.ro-reports', compact('reports'));
+}
+
+public function pendingPusat()
+{
+    $reports = InspeksiHeader::where('status_workflow','pending_pusat')
+        ->with(['pmSchedule.segment'])
+        ->latest()
+        ->get();
+
+    return view('approval.pusat-reports', compact('reports'));
+
+}
+
+public function modal($id)
+{
+    $report = InspeksiHeader::with([
+        'pmSchedule.segment',
+        'kondisiUmum',
+        'fmeaDetails',
+        'details'
+    ])->findOrFail($id);
+
+    return view('inspeksi.modal-report', compact('report'));
+}
 }

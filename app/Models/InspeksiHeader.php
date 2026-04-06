@@ -6,12 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Models\InspeksiFmeaDetail;
 use App\Models\InspeksiKondisiUmum;
 use App\Models\PmSchedule;
-use App\Models\Approval;
-
+use App\Models\InspeksiDetail;
+use App\Models\User;
 class InspeksiHeader extends Model
 {
     protected $table = 'inspeksi_headers';
@@ -53,10 +52,7 @@ class InspeksiHeader extends Model
         return $this->belongsTo(PmSchedule::class, 'schedule_id');
     }
 
-   public function approvals(): MorphMany
-{
-    return $this->morphMany(Approval::class, 'approvable');
-}
+ 
 
        
     public function getRiskSummaryAttribute()
@@ -70,4 +66,22 @@ class InspeksiHeader extends Model
             return ['priority' => 'RENDAH', 'recommendation' => 'Jadwalkan inspeksi rutin'];
         }
     }
+
+    public function details()
+{
+    return $this->hasMany(InspeksiDetail::class,'inspeksi_id');
+}
+
+public function preparer()
+{
+    return $this->belongsTo(User::class,'prepared_by');
+}
+
+public function approver()
+{
+    return $this->belongsTo(User::class,'approved_by');
+}
+
+
+
 }

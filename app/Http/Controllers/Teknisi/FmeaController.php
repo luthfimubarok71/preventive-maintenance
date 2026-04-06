@@ -8,9 +8,21 @@ use App\Models\User;
 use App\Models\InspeksiHeader;
 use App\Models\InspeksiFmeaDetail;
 use App\Models\InspeksiKondisiUmum;
+use App\Models\InspeksiDetail;
+use App\Models\PmSchedule;
 
 class FmeaController extends Controller
 {
+    /**
+     * Get available approved schedules for today
+     */
+    private function getAvailableSchedules()
+    {
+        return PmSchedule::where('status', 'approved')
+            ->whereDate('planned_date', today())
+            ->get();
+    }
+
     public function index(Request $request)
     {
         // ================= INIT =================
@@ -25,6 +37,9 @@ class FmeaController extends Controller
         // dropdown teknisi
         $teknisi = User::where('role', 'teknisi')->get();
         $approver = User::whereIn('role',['kepala_ro','pusat'])->get();
+
+        // Get available approved schedules for the day
+        $availableSchedules = $this->getAvailableSchedules();
 
         // RPN maksimum
         $rpnMax = [
@@ -62,6 +77,25 @@ class FmeaController extends Controller
         // ================= LOGIKA FMEA =================
         if ($request->isMethod('post')) {
 
+            // ========== TASK 1: ENFORCE SCHEDULE REQUIREMENT ==========
+            $selectedScheduleId = $request->schedule_id;
+            
+            // Validate that schedule_id is provided
+            if (!$selectedScheduleId) {
+                return back()->with('error', 'Schedule ID wajib dipilih.')->withInput();
+            }
+            
+            // Find the approved schedule
+            $approvedSchedule = PmSchedule::where('id', $selectedScheduleId)
+                ->where('status', 'approved')
+                ->whereDate('planned_date', today())
+                ->first();
+
+            // Check if approved schedule exists
+            if (!$approvedSchedule) {
+                return back()->with('error', 'No approved schedule available for today.')->withInput();
+            }
+
             // 1. Kabel Putus
             if ($request->kabel_putus['status'] === 'ya') {
                 if ($request->kabel_putus['dampak'] === 'down') {
@@ -73,7 +107,9 @@ class FmeaController extends Controller
                 }
 
                 $S = $adjustBackbone($S);
-                $hitung('Kabel Putus', $S, 2, 1);
+                // Get occurrence from request (allow manual input for demo mode)
+                $O = $request->kabel_putus['occurrence'] ?? 2;
+                $hitung('Kabel Putus', $S, $O, 1);
             }
 
             // 2. Kabel Expose
@@ -85,8 +121,10 @@ class FmeaController extends Controller
                 };
                 if ($request->kabel_expose['lingkungan'] !== 'aman') $S++;
                 $S = $adjustBackbone(min($S, 5));
-
-                $hitung('Kabel Expose', $S, 2, 2);
+                
+                // Get occurrence from request
+                $O = $request->kabel_expose['occurrence'] ?? 2;
+                $hitung('Kabel Expose', $S, $O, 2);
             }
 
             // 3. Penyangga Jembatan
@@ -98,8 +136,10 @@ class FmeaController extends Controller
                 };
                 if ($request->penyangga['kabel'] !== 'aman') $S++;
                 $S = $adjustBackbone(min($S, 5));
-
-                $hitung('Penyangga Kabel di Jembatan', $S, 2, 2);
+                
+                // Get occurrence from request
+                $O = $request->penyangga['occurrence'] ?? 2;
+                $hitung('Penyangga Kabel di Jembatan', $S, $O, 2);
             }
 
             // 4. Tiang KU
@@ -111,8 +151,10 @@ class FmeaController extends Controller
                 };
                 if ($request->tiang['miring'] === 'berat') $S++;
                 $S = $adjustBackbone(min($S, 5));
-
-                $hitung('Tiang KU', $S, 2, 1);
+                
+                // Get occurrence from request
+                $O = $request->tiang['occurrence'] ?? 2;
+                $hitung('Tiang KU', $S, $O, 1);
             }
 
             // 5. Kabel di Clamp
@@ -123,8 +165,10 @@ class FmeaController extends Controller
                     default => 2
                 };
                 $S = $adjustBackbone($S);
-
-                $hitung('Kabel di Clamp', $S, 2, 2);
+                
+                // Get occurrence from request
+                $O = $request->clamp['occurrence'] ?? 2;
+                $hitung('Kabel di Clamp', $S, $O, 2);
             }
 
             // 6. Lingkungan
@@ -135,21 +179,25 @@ class FmeaController extends Controller
                     default => 2
                 };
                 $S = $adjustBackbone($S);
-
-                $hitung('Lingkungan', $S, 2, 3);
+                
+                // Get occurrence from request
+                $O = $request->lingkungan['occurrence'] ?? 2;
+                $hitung('Lingkungan', $S, $O, 3);
             }
 
             // 7. Vegetasi
             if ($request->vegetasi['status'] === 'tidak_aman') {
                 $S = match ($request->vegetasi['jarak']) {
-                    'tumbang' => 4,
+                    'tumbnail' => 4,
                     'tekan' => 3,
                     'sentuh' => 2,
                     default => 1
                 };
                 $S = $adjustBackbone($S);
-
-                $hitung('Vegetasi', $S, 2, 3);
+                
+                // Get occurrence from request
+                $O = $request->vegetasi['occurrence'] ?? 2;
+                $hitung('Vegetasi', $S, $O, 3);
             }
 
             // ================= PRIORITAS =================
@@ -164,7 +212,8 @@ class FmeaController extends Controller
                 $schedule = 'minimal pm 1x sebulan';
             }
 
-            // ================= SIMPAN DATA =================
+            // ========== TASK 2 & 3: LINK TO SCHEDULE & SET WORKFLOW STATUS ==========
+            // Create inspection with approved schedule and pending_ro status
             $inspeksi = InspeksiHeader::create([
                 'segment_inspeksi' => $request->segment_inspeksi,
                 'jalur_fo' => $request->jalur_fo,
@@ -177,17 +226,20 @@ class FmeaController extends Controller
                 'schedule_pm' => $schedule,
                 'prepared_by' => $request->prepared_by,
                 'approved_by' => $request->approved_by,
-                'schedule_id' => null,
-                'status_workflow' => 'draft',
+                // ========== TASK 2: LINK FMEA TO SCHEDULE ==========
+                'schedule_id' => $approvedSchedule->id, // Mandatory from approved schedule
+                // ========== TASK 4: SET WORKFLOW STATUS ==========
+                'status_workflow' => 'pending_ro', // Change from draft to pending_ro
             ]);
 
-            // Simpan FMEA Details
+            // ========== TASK 7: DYNAMIC OCCURRENCE ==========
+            // Save FMEA Details with dynamic occurrence values
             foreach ($results as $result) {
                 InspeksiFmeaDetail::create([
                     'inspeksi_id' => $inspeksi->id,
                     'item' => $result['item'],
                     'severity' => $result['S'],
-                    'occurrence' => 2, // Fixed value based on code
+                    'occurrence' => $result['O'], // Dynamic value from request
                     'detection' => $result['D'],
                     'rpn' => $result['RPN'],
                     'risk_index' => $result['index'],
@@ -204,18 +256,20 @@ class FmeaController extends Controller
             ]);
 
             // Simpan hasil perhitungan ke session
-            session([
-                'results' => $results,
-                'priority' => $priority,
-                'schedule' => $schedule,
-                'maxIndex' => $maxIndex,
-            ]);
+           session([
+    'results' => $results,
+    'priority' => $priority,
+    'schedule' => $schedule,
+    'maxIndex' => $maxIndex,
+    'selected_segment' => $request->segment_inspeksi
+]);
 
-            return redirect('/fmeaoutput')->with('success', 'Data inspeksi berhasil disimpan ke database, termasuk detail FMEA di tabel inspeksi_fmea_details.');
+            return redirect('/fmeaoutput')->with('success', 'Data inspeksi berhasil disimpan dan menunggu approval Kepala RO.');
         }
-return view('fmea-demo', compact(
-    'teknisi','approver','results','maxIndex','priority','schedule'
-));
+        
+        return view('fmea-demo', compact(
+            'teknisi','approver','results','maxIndex','priority','schedule','availableSchedules'
+        ));
 
 
     }
@@ -300,37 +354,188 @@ return view('fmea-demo', compact(
         return view('hasilfmea', compact('data', 'segments', 'selectedSegment'));
     }
 
-    public function output(Request $request)
-    {
-        $segments = InspeksiHeader::select('segment_inspeksi')->distinct()->pluck('segment_inspeksi');
-        $selectedSegment = $request->get('segment', $segments->first());
+ public function output(Request $request)
+{
+    $segments = InspeksiHeader::select('segment_inspeksi')->distinct()->pluck('segment_inspeksi');
+    $selectedSegment = $request->get('segment', $segments->first());
 
-        $results = session('results', []);
-        $priority = session('priority');
-        $schedule = session('schedule');
-        $maxIndex = session('maxIndex', 0);
+    // ambil inspeksi terakhir dari segment
+    $latestInspeksi = InspeksiHeader::where('segment_inspeksi', $selectedSegment)
+        ->latest()
+        ->first();
 
-        // Jika session kosong atau segment berbeda, ambil dari database berdasarkan segment
-        if (empty($results) || session('selected_segment') != $selectedSegment) {
-            $latestInspeksi = InspeksiHeader::where('segment_inspeksi', $selectedSegment)->latest()->first();
-            if ($latestInspeksi) {
-                $fmeaDetails = InspeksiFmeaDetail::where('inspeksi_id', $latestInspeksi->id)->get();
-                $results = $fmeaDetails->map(function ($detail) {
-                    return [
-                        'item' => $detail->item,
-                        'S' => $detail->severity,
-                        'O' => $detail->occurrence,
-                        'D' => $detail->detection,
-                        'RPN' => $detail->rpn,
-                        'index' => $detail->risk_index,
-                    ];
-                })->toArray();
-                $priority = $latestInspeksi->priority;
-                $schedule = $latestInspeksi->schedule_pm;
-                $maxIndex = $fmeaDetails->max('risk_index') ?? 0;
-            }
+    if(!$latestInspeksi){
+        return view('fmeaoutput',compact('segments','selectedSegment'))
+            ->with('error','Data inspeksi belum ada');
+    }
+    // ambil detail inspeksi
+    $details = $latestInspeksi->details;
+
+    $results = [];
+
+    foreach($details as $d){
+
+        $status = json_decode($d->status,true);
+
+        $S = 1;
+        $O = 1;
+        $D = 1;
+
+        // ===== Kabel Putus =====
+        if($d->objek == 'kabel_putus' && $status['status'] == 'ya'){
+            $S = 5;
+
+$O = $this->hitungOccurrence(
+    $selectedSegment,
+    'kabel_putus',
+    'status',
+    'ya'
+);         
+   $D = 1;
+        }
+if($d->objek == 'kabel_expose' && $status['status'] == 'ada'){
+    $S = 4;
+$O = $this->hitungOccurrence(
+    $selectedSegment,
+    'kabel_expose',
+    'status',
+    'ada'
+);    $D = 2;
+}
+
+if($d->objek == 'penyangga' && $status['status'] == 'rusak'){
+    $S = 4;
+$O = $this->hitungOccurrence(
+    $selectedSegment,
+    'penyangga',
+    'status',
+    'rusak'
+);
+    $D = 2;
+}
+
+        // ===== Tiang =====
+        if($d->objek == 'tiang' && $status['posisi'] == 'miring'){
+            $S = 3;
+$O = $this->hitungOccurrence(
+    $selectedSegment,
+    'tiang',
+    'posisi',
+    'miring'
+);            
+$D = 1;
         }
 
-        return view('fmeaoutput', compact('results', 'priority', 'schedule', 'maxIndex', 'segments', 'selectedSegment'));
+        // ===== Clamp =====
+        if($d->objek == 'clamp' && $status['status'] == 'rusak'){
+            $S = 4;
+$O = $this->hitungOccurrence(
+    $selectedSegment,
+    'clamp',
+    'status',
+    'rusak'
+);
+            $D = 2;
+        }
+if($d->objek == 'lingkungan' && $status['status'] == 'tidak_aman'){
+    $S = 3;
+$O = $this->hitungOccurrence(
+    $selectedSegment,
+    'lingkungan',
+    'status',
+    'tidak_aman'
+);    $D = 3;
+}
+if($d->objek == 'vegetasi' && $status['status'] == 'tidak_aman'){
+    $S = 3;
+$O = $this->hitungOccurrence(
+    $selectedSegment,
+    'vegetasi',
+    'status',
+    'tidak_aman'
+);
+    $D = 3;
+}
+
+       if($S == 1) continue;
+
+        $RPN = $S * $O * $D;
+        $index = $RPN / 75;
+
+      
+
+        $results[] = [
+            'item'=>$d->objek,
+            'S'=>$S,
+            'O'=>$O,
+            'D'=>$D,
+            'RPN'=>$RPN,
+            'index'=>$index
+        ];
     }
+
+    if(empty($results)){
+    return view('fmeaoutput',compact(
+        'segments',
+        'selectedSegment'
+    ))->with('info','Tidak ada kerusakan pada inspeksi ini');
+}
+
+    $maxIndex = collect($results)->max('index');
+
+    if($maxIndex >= 0.8){
+        $priority = 'KRITIS';
+        $schedule = 'minimal pm 3x sebulan';
+    }elseif($maxIndex >= 0.4){
+        $priority = 'SEDANG';
+        $schedule = 'minimal pm 2x sebulan';
+    }else{
+        $priority = 'RENDAH';
+        $schedule = 'minimal pm 1x sebulan';
+    }
+
+    $latestInspeksi->update([
+        'priority'=>$priority,
+        'schedule_pm'=>$schedule
+    ]);
+
+    return view('fmeaoutput',compact(
+        'results',
+        'priority',
+        'schedule',
+        'maxIndex',
+        'segments',
+        'selectedSegment'
+    ));
+}
+private function hitungOccurrence($segment, $objek, $field, $value)
+{
+    $inspeksiIds = InspeksiHeader::where('segment_inspeksi', $segment)
+        ->pluck('id');
+
+$details = InspeksiDetail::whereIn('inspeksi_id',$inspeksiIds)   
+     ->where('objek',$objek)
+        ->get();
+
+    $jumlah = 0;
+
+    foreach($details as $d){
+
+        $status = json_decode($d->status,true);
+
+        if(isset($status[$field]) && $status[$field] == $value){
+            $jumlah++;
+        }
+    }
+
+    // konversi jumlah kejadian ke skala FMEA
+    if($jumlah >=5) return 5;
+    if($jumlah >=3) return 4;
+    if($jumlah >=2) return 3;
+    if($jumlah ==1) return 2;
+
+    return 1;
+}
+
+
 }

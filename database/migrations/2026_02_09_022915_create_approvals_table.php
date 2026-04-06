@@ -16,7 +16,7 @@ return new class extends Migration
             $table->morphs('approvable');
             $table->foreignId('approver_id')->constrained('users');
             $table->enum('role', ['teknisi', 'kepala_ro', 'pusat']);
-            $table->enum('status', ['approved', 'rejected']);
+            $table->enum('status', ['approved', 'rejected', 'pending'])->default('pending');
             $table->text('comments')->nullable();
             $table->text('signature')->nullable();
             $table->timestamp('approved_at')->nullable();

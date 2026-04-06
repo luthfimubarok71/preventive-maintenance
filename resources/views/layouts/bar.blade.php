@@ -1,13 +1,15 @@
 <!doctype html>
 <html lang="id">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>@yield('title', 'Dashboard')</title>
-
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
             --blue: #2563eb;
@@ -26,7 +28,9 @@
             --muted: #94a3b8;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
 
         body {
             margin: 0;
@@ -183,24 +187,24 @@
         .profile-dropdown a:hover {
             background: rgba(37, 99, 235, 0.08);
         }
-        
-        .logout-btn {
-    width: 100%;
-    background: none;
-    border: none;
-    padding: 10px 18px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #dc2626;
-    font-size: 14px;
-    cursor: pointer;
-    text-align: left;
-}
 
-.logout-btn:hover {
-    background: rgba(220, 38, 38, 0.08);
-}
+        .logout-btn {
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #dc2626;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .logout-btn:hover {
+            background: rgba(220, 38, 38, 0.08);
+        }
 
         /* ===== CONTAINER ===== */
         .container {
@@ -216,7 +220,10 @@
         }
 
         @media (max-width: 900px) {
-            header { padding: 16px 24px; }
+            header {
+                padding: 16px 24px;
+            }
+
             .menu {
                 position: static;
                 transform: none;
@@ -230,84 +237,82 @@
 
 <body>
 
-<header>
-    <div class="logo-circle">
-        <img src="{{ asset('assets/image/logo_pgn.png') }}" alt="Logo">
-    </div>
-<div class="menu">
-    <a href="/admin/dashboard"
-       class="{{ request()->is('admin/dashboard') ? 'active' : '' }}">
-        Beranda
-    </a>
+    <header>
+        <div class="logo-circle">
+            <img src="{{ asset('assets/image/logo_pgn.png') }}" alt="Logo">
+        </div>
+        <div class="menu">
+            <a href="/admin/dashboard" class="{{ request()->is('admin/dashboard') ? 'active' : '' }}">
+                Beranda
+            </a>
 
-    <a href="/admin/admin-fitur"
-       class="{{ request()->is('admin/admin-fitur') ? 'active' : '' }}">
-        Fitur
-    </a>
+            <a href="/admin/admin-fitur" class="{{ request()->is('admin/admin-fitur') ? 'active' : '' }}">
+                Fitur
+            </a>
 
-    <a href="/tentang"
-       class="{{ request()->is('tentang') ? 'active' : '' }}">
-        Tentang
-    </a>
+            <a href="/tentang" class="{{ request()->is('tentang') ? 'active' : '' }}">
+                Tentang
+            </a>
 
-    <a href="/bantuan"
-       class="{{ request()->is('bantuan') ? 'active' : '' }}">
-        Bantuan
-    </a>
-</div>
+            <a href="/bantuan" class="{{ request()->is('bantuan') ? 'active' : '' }}">
+                Bantuan
+            </a>
+        </div>
 
 
-    <div class="right-area">
-        <div class="toggle" onclick="toggleDark()"></div>
+        <div class="right-area">
+            <div class="toggle" onclick="toggleDark()"></div>
 
-        <div class="profile-wrapper">
-            <div class="profile" onclick="toggleProfile()">
-                Profile <i class="bi bi-person-circle"></i>
-            </div>
+            <div class="profile-wrapper">
+                <div class="profile" onclick="toggleProfile()">
+                    Profile <i class="bi bi-person-circle"></i>
+                </div>
 
-            <div class="profile-dropdown" id="profileDropdown">
-                <a href="/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
-                <a href="{{ route('account.index') }}"><i class="bi bi-person-gear"></i> Account Settings</a>
-                <a href="{{ route('settings.index') }}"><i class="bi bi-gear"></i> Pengaturan</a>
-                <form method="POST" action="{{ route('logout') }}">
-    @csrf
-    <button type="submit" class="logout-btn">
-        <i class="bi bi-box-arrow-right"></i>
-        Logout
-    </button>
-</form>
+                <div class="profile-dropdown" id="profileDropdown">
+                    <a href="/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                    <a href="{{ route('account.index') }}"><i class="bi bi-person-gear"></i> Account Settings</a>
+                    <a href="{{ route('settings.index') }}"><i class="bi bi-gear"></i> Pengaturan</a>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="logout-btn">
+                            <i class="bi bi-box-arrow-right"></i>
+                            Logout
+                        </button>
+                    </form>
 
+                </div>
             </div>
         </div>
+    </header>
+
+    <div class="container">
+        @yield('content')
     </div>
-</header>
 
-<div class="container">
-    @yield('content')
-</div>
+    <footer>
+        Sistem Preventive Maintenance • © {{ date('Y') }}
+    </footer>
 
-<footer>
-    Sistem Preventive Maintenance • © {{ date('Y') }}
-</footer>
-
-<script>
-    function toggleDark() {
-        document.body.classList.toggle('dark');
-    }
-
-    function toggleProfile() {
-        document.getElementById('profileDropdown').classList.toggle('show');
-    }
-
-    document.addEventListener('click', function(e) {
-        const profile = document.querySelector('.profile-wrapper');
-        if (!profile.contains(e.target)) {
-            document.getElementById('profileDropdown').classList.remove('show');
+    <script>
+        function toggleDark() {
+            document.body.classList.toggle('dark');
         }
-    });
-</script>
 
-@stack('script')
+        function toggleProfile() {
+            document.getElementById('profileDropdown').classList.toggle('show');
+        }
+
+        document.addEventListener('click', function(e) {
+            const profile = document.querySelector('.profile-wrapper');
+            if (!profile.contains(e.target)) {
+                document.getElementById('profileDropdown').classList.remove('show');
+            }
+        });
+    </script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    @stack('scripts')
 
 </body>
+
 </html>

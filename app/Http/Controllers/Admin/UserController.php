@@ -6,14 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-
+use App\Models\Regional;
 class UserController extends Controller
 {
-    public function index()
-    {
-        $users = User::latest()->get();
-        return view('admin.index', compact('users'));
-    }
+   public function index()
+{
+    $users = User::latest()->get();
+    $regionals = Regional::all(); // 🔥 ini yang kurang
+
+    return view('admin.index', compact('users', 'regionals'));
+}
 
     public function create()
     {
@@ -27,6 +29,7 @@ class UserController extends Controller
             'email'    => 'required|email|unique:users',
             'password' => 'required|min:6|confirmed',
             'role'     => 'required',
+            'regional_id' => 'required|exists:regionals,id', 
         ]);
 
         try {
@@ -35,6 +38,7 @@ class UserController extends Controller
                 'email'    => $request->email,
                 'password' => Hash::make($request->password),
                 'role'     => $request->role,
+                'regional_id'  => $request->regional_id,
             ]);
 
             return redirect()->route('admin.users.index')
@@ -53,7 +57,7 @@ class UserController extends Controller
     {
         $request->validate([
             'username' => 'required',
-            'email'    => 'required|email|unique:users,email,' . $user->id,
+            'email' => 'required|unique:users,email,' . $user->id,
             'role'     => 'required',
         ]);
 
@@ -63,10 +67,14 @@ class UserController extends Controller
             $data['password'] = Hash::make($request->password);
         }
 
-        $user->update($data);
+        try {
+            $user->update($data);
 
-        return redirect()->route('admin.users.index')
-            ->with('success', 'User berhasil diupdate');
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil diupdate');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Gagal update user: ' . $e->getMessage()]);
+        }
     }
 
     public function destroy(User $user)

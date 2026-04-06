@@ -6,14 +6,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
-
+use App\Models\Regional;
+use App\Models\User;
 class AccountController extends Controller
 {
-    public function index()
-    {
-        $user = Auth::user();
-        return view('account.index', compact('user'));
-    }
+   public function index()
+{
+    $users = User::all();
+    $regionals = Regional::all(); // 🔥 WAJIB
+
+    return view('admin.index', compact('users', 'regionals'));
+}
 
     public function update(Request $request)
     {

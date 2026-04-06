@@ -5,19 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany; // tambahkan ini
 
 class PmSchedule extends Model
 {
     protected $fillable = [
-        'segment_inspeksi',
-        'planned_date',
-        'priority',
-        'status',
-        'created_by',
-        'approved_by',
-        'signature_teknisi',
-        'signature_ro',
-    ];
+    'segment_id',
+    'planned_date',
+    'priority',
+    'status',
+    'created_by',
+    'approved_by',
+    'approved_at',
+    'signature_teknisi',
+    'signature_ro',
+    'teknisi_1',
+    'teknisi_2',
+    'notes',
+];
 
     protected $casts = [
         'planned_date' => 'date',
@@ -33,13 +38,25 @@ class PmSchedule extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    public function inspeksiHeaders(): HasMany
+    public function teknisi1(): BelongsTo
     {
-        return $this->hasMany(InspeksiHeader::class, 'schedule_id');
+        return $this->belongsTo(User::class, 'teknisi_1');
     }
 
-    public function approvals(): HasMany
+    public function teknisi2(): BelongsTo
     {
-        return $this->morphMany(Approval::class, 'approvable');
+        return $this->belongsTo(User::class, 'teknisi_2');
     }
+
+   
+public function segment()
+{
+    return $this->belongsTo(Segment::class);
+}
+public function inspeksiHeader()
+{
+    return $this->hasOne(\App\Models\InspeksiHeader::class,'schedule_id');
+}
+
+
 }

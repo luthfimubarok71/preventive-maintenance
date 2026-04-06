@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="id">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -105,16 +106,30 @@
             box-shadow: 0 22px 48px rgba(37, 99, 235, 0.6);
         }
 
+        .start-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        .preview {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .start-wrapper {
+            margin-top: 20px;
+        }
+
         /* ===== IMAGE BOX ===== */
         .image-box {
             height: 380px;
             border-radius: 18px;
             overflow: hidden;
-            background: linear-gradient(
-                135deg,
-                rgba(96, 165, 250, 0.25),
-                rgba(37, 99, 235, 0.85)
-            );
+            background: linear-gradient(135deg,
+                    rgba(96, 165, 250, 0.25),
+                    rgba(37, 99, 235, 0.85));
             box-shadow: 0 22px 54px rgba(37, 99, 235, 0.35);
             transition: 0.4s;
         }
@@ -184,6 +199,7 @@
                 opacity: 0;
                 transform: translateX(-40px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
@@ -195,6 +211,7 @@
                 opacity: 0;
                 transform: translateX(40px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
@@ -206,6 +223,7 @@
                 opacity: 0;
                 transform: translateY(24px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -245,59 +263,59 @@
 
 <body>
 
-<div class="container">
+    <div class="container">
 
-    <!-- MAIN -->
-    <main>
+        <!-- MAIN -->
+        <main>
 
-        <!-- HERO / LEFT -->
-        <div class="hero">
-            <img src="{{ asset('assets/image/pgncomlogo.png') }}" 
-                 alt="Logo" 
-                 class="hero-logo">
+            <!-- HERO / LEFT -->
+            <div class="hero">
+                <img src="{{ asset('assets/image/pgncomlogo.png') }}" alt="Logo" class="hero-logo">
 
-            <h1>
-                Kelola Aktivitas Operasional<br>
-                Lebih Mudah, Cepat, dan<br>
-                Terstruktur
-            </h1>
+                <h1>
+                    Kelola Aktivitas Operasional<br>
+                    Lebih Mudah, Cepat, dan<br>
+                    Terstruktur
+                </h1>
 
-            <p class="current-date">
-                Tanggal hari ini: {{ date('l, d F Y') }}
-            </p>
-        </div>
-
-        <!-- PREVIEW / RIGHT -->
-        <div class="preview">
-
-            <div class="image-box">
-                <img src="{{ asset('assets/image/dashboard.png') }}" 
-                     alt="Preview Dashboard">
+                <p class="current-date">
+                    Tanggal hari ini: {{ date('l, d F Y') }}
+                </p>
             </div>
 
-            <a href="/login" class="start-btn">
-                Start
-            </a>
+            <!-- PREVIEW / RIGHT -->
+            <div class="preview">
 
-            <div class="toggle" onclick="toggleDark()"></div>
+                <div class="image-box">
+                    <img src="{{ asset('assets/image/dashboard.png') }}" alt="Preview Dashboard">
+                </div>
 
-        </div>
+                <div class="start-wrapper">
+                    <a href="/login" class="start-btn">
+                        Start
+                    </a>
+                </div>
 
-    </main>
+                <div class="toggle" onclick="toggleDark()"></div>
 
-    <!-- FOOTER -->
-    <footer>
-        Sistem ini dirancang untuk meningkatkan efektivitas kerja tim dengan pencatatan rapi,
-        proses terkontrol, dan monitoring transparan.
-    </footer>
+            </div>
 
-</div>
+        </main>
 
-<script>
-    function toggleDark() {
-        document.body.classList.toggle('dark');
-    }
-</script>
+        <!-- FOOTER -->
+        <footer>
+            Sistem ini dirancang untuk meningkatkan efektivitas kerja tim dengan pencatatan rapi,
+            proses terkontrol, dan monitoring transparan.
+        </footer>
+
+    </div>
+
+    <script>
+        function toggleDark() {
+            document.body.classList.toggle('dark');
+        }
+    </script>
 
 </body>
+
 </html>
