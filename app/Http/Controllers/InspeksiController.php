@@ -458,16 +458,26 @@ public function pendingRO()
     return view('approval.ro-reports', compact('reports'));
 }
 
-public function pendingPusat()
+
+
+public function pendingPusat(Request $request)
 {
-    $reports = InspeksiHeader::where('status_workflow','pending_pusat')
+    $query = InspeksiHeader::where('status_workflow','pending_pusat')
+        ->with(['pmSchedule.segment', 'creator.regional']);
 
-    ->with(['pmSchedule.segment', 'creator.regional']) 
-    ->latest()
-    ->get();
+    // ✅ FILTER REGIONAL
+    if ($request->regional) {
+        $query->whereHas('creator.regional', function ($q) use ($request) {
+            $q->where('id', $request->regional);
+        });
+    }
 
-    return view('approval.pusat-reports', compact('reports'));
+    $reports = $query->latest()->get();
 
+    // ✅ ambil data regional buat dropdown
+    $regionals = \App\Models\Regional::all();
+
+    return view('approval.pusat-reports', compact('reports','regionals'));
 }
 
 public function modal($id)

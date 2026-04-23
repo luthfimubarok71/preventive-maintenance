@@ -2,6 +2,57 @@
 
 @push('style')
     <style>
+        /* FILTER BAR */
+        .pm-filter-bar {
+            background: var(--card);
+            border-radius: 14px;
+            padding: 16px 18px;
+            margin-bottom: 20px;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            box-shadow: 0 10px 30px rgba(37, 99, 235, 0.1);
+        }
+
+        .pm-filter-left {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .pm-filter-select {
+            border: 1px solid #dbeafe;
+            border-radius: 10px;
+            padding: 8px 12px;
+            background: white;
+            min-width: 200px;
+        }
+
+        /* BUTTON */
+        .pm-filter-apply {
+            background: linear-gradient(135deg, #60a5fa, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 8px 18px;
+            font-weight: 600;
+        }
+
+        .pm-filter-reset {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 10px;
+            padding: 8px 18px;
+            font-weight: 500;
+            color: #334155;
+        }
+
+        .pm-filter-reset:hover {
+            background: #cbd5f5;
+        }
+
         /* WRAPPER */
         .fmea-wrapper {
             padding-top: 20px;
@@ -69,7 +120,43 @@
                 <h4>Laporan Menunggu Approval Pusat</h4>
                 <p>Daftar laporan yang menunggu persetujuan pusat</p>
             </div>
+            <form method="GET" class="mb-3">
+                <div class="pm-filter-bar">
 
+                    <form method="GET" style="display:flex; width:100%; justify-content:space-between; align-items:center;">
+
+                        <div class="pm-filter-left">
+
+                            {{-- FILTER REGIONAL --}}
+                            <select name="regional" class="pm-filter-select">
+                                <option value="">Semua Regional</option>
+
+                                @foreach ($regionals as $reg)
+                                    <option value="{{ $reg->id }}"
+                                        {{ request('regional') == $reg->id ? 'selected' : '' }}>
+                                        {{ $reg->nama_regional }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                        </div>
+
+                        <div style="display:flex; gap:10px;">
+
+                            <button class="pm-filter-apply">
+                                <i class="bi bi-funnel"></i> Terapkan
+                            </button>
+
+                            <a href="{{ url()->current() }}" class="pm-filter-reset">
+                                Reset
+                            </a>
+
+                        </div>
+
+                    </form>
+
+                </div>
+            </form>
             <div class="table-modern">
                 <table>
                     <thead>

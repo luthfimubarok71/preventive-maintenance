@@ -33,13 +33,25 @@ class DashboardController extends Controller
 
 $nextSchedule = DB::table('pm_schedules')
     ->join('segments', 'pm_schedules.segment_id', '=', 'segments.id')
+
+    // 🔥 JOIN ke inspeksi
+    ->leftJoin('inspeksi_headers', function ($join) use ($userId) {
+        $join->on('pm_schedules.id', '=', 'inspeksi_headers.schedule_id')
+             ->where('inspeksi_headers.prepared_by', $userId);
+    })
+
     ->select(
         'pm_schedules.*',
         'segments.nama_segment'
     )
+
     ->where('pm_schedules.teknisi_1', $userId)
     ->where('pm_schedules.status', 'approved')
     ->whereDate('pm_schedules.planned_date', '>=', now())
+
+    // 🔥 skip yang sudah ada laporan
+    ->whereNull('inspeksi_headers.id')
+
     ->orderBy('pm_schedules.planned_date', 'asc')
     ->first();
   
